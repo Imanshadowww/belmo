@@ -1,23 +1,24 @@
+
 const https = require('https');
 const fs = require('fs');
 const { exec, spawn } = require('child_process');
 const http = require('http');
 
-// محدودیت رم برای جلوگیری از کرش در سرورهای رایگان
-process.env.GOMEMLIMIT = '100MiB';
 const port = process.env.PORT || 3000;
 
-// ۱. روشن کردن فوری سرور برای تایید شدن توسط Belmo
+// ساخت یک محیط ایزوله برای تیل‌اسکیل تا پورت ۳۰۰۰ را نبیند و تداخل نکند
+const tsEnv = Object.assign({}, process.env);
+delete tsEnv.PORT;
+tsEnv.GOMEMLIMIT = '100MiB';
+
 http.createServer((req, res) => {
     res.writeHead(200);
     res.end('Tailscale is running!');
 }).listen(port, '0.0.0.0', () => {
     console.log(`[Web] Dummy server listening on port ${port}`);
-    // ۲ ثانیه صبر میکنیم تا سرور به عنوان "سالم" در داشبورد ثبت شود
     setTimeout(setupTailscale, 2000);
 });
 
-// ۲. دانلود و استخراج در پس‌زمینه (بدون قفل کردن سرور)
 function setupTailscale() {
     console.log("[Setup] Downloading Tailscale...");
     const file = fs.createWriteStream("/tmp/ts.tgz");
@@ -42,7 +43,6 @@ function setupTailscale() {
     });
 }
 
-// ۳. اجرای هسته و احراز هویت
 function startTailscale() {
     console.log("[Tailscale] Starting daemon...");
     exec("mkdir -p /tmp/tailscale-state");
@@ -52,10 +52,11 @@ function startTailscale() {
         "--socks5-server=localhost:1055",
         "--statedir=/tmp/tailscale-state",
         "--socket=/tmp/tailscaled.sock"
-    ]);
+    ], { env: tsEnv });
 
+    // چاپ لاگ‌های عادی بدون برچسب ارور اشتباه
     daemon.stdout.on('data', (d) => console.log(`[Daemon] ${d}`.trim()));
-    daemon.stderr.on('data', (d) => console.error(`[Daemon Error] ${d}`.trim()));
+    daemon.stderr.on('data', (d) => console.log(`[Daemon] ${d}`.trim()));
 
     console.log("[Tailscale] Waiting 5 seconds for daemon to initialize...");
     setTimeout(() => {
@@ -67,9 +68,9 @@ function startTailscale() {
             "--hostname=faable-server",
             "--advertise-exit-node",
             "--accept-dns=false"
-        ]);
+        ], { env: tsEnv });
 
         auth.stdout.on('data', (d) => console.log(`[Auth] ${d}`.trim()));
-        auth.stderr.on('data', (d) => console.error(`[Auth Error] ${d}`.trim()));
+        auth.stderr.on('data', (d) => console.log(`[Auth] ${d}`.trim()));
     }, 5000);
 }
