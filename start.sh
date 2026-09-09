@@ -9,5 +9,5 @@ echo "Starting tailscaled in userspace mode..."
 
 sleep 5
 
-echo "Authenticating Tailscale with reset..."
-./tailscale_1.74.0_amd64/tailscale --socket=/tmp/tailscaled.sock up --reset --authkey="${TS_AUTHKEY}" --hostname=Wispbyte-Server --accept-dns=false
+echo "Authenticating Tailscale..."
+./tailscale_1.74.0_amd64/tailscale --socket=/tmp/tailscaled.sock up --reset --authkey="${TS_AUTHKEY}" --hostname=Wispbyte-Server --advertise-exit-node --accept-dns=false
