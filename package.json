@@ -1,0 +1,6 @@
+{
+  "name": "tailscale-app",
+  "scripts": {
+    "start": "node download.js"
+  }
+}
