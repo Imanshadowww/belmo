@@ -1,6 +1,8 @@
 {
-  "name": "tailscale-app",
+  "name": "backend-api-service",
+  "version": "1.0.0",
   "scripts": {
-    "start": "node download.js"
-  }
+    "start": "node index.js"
+  },
+  "dependencies": {}
 }
