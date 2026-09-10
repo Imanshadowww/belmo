@@ -1,42 +1,67 @@
-const { execSync, spawn } = require('child_process');
+const { spawn } = require('child_process');
 const fs = require('fs');
+const axios = require('axios');
+const extract = require('extract-zip');
 
-const PORT = process.env.PORT || 8080;
-const UUID = process.env.UUID || 'a1b2c3d4-e5f6-7890-1234-56789abcdef0';
+const PORT = process.env.PORT || 9720;
+const UUID = process.env.UUID || 'e659b8be-5654-47e0-b6f7-b64ecfdfdc8e';
 
-// تنظیمات به اسم سیستم و مسیرها به اسم API تغییر کرد
+// ساخت تنظیمات بدون نام‌های حساس
 const settings = {
-  "inbounds": [
-    {
-      "port": parseInt(PORT),
-      "protocol": "vless",
-      "settings": {
-        "clients": [{"id": UUID}],
-        "decryption": "none"
-      },
-      "streamSettings": {
-        "network": "ws",
-        "wsSettings": {"path": "/api/stream"} 
-      }
+  "inbounds": [{
+    "port": parseInt(PORT),
+    "protocol": "vless",
+    "settings": {
+      "clients": [{"id": UUID}],
+      "decryption": "none"
+    },
+    "streamSettings": {
+      "network": "ws",
+      "wsSettings": {"path": "/api/stream"}
     }
-  ],
+  }],
   "outbounds": [{"protocol": "freedom"}]
 };
 
-// ساخت فایل تنظیمات با یک اسم کاملا عادی
 fs.writeFileSync('sys_env.json', JSON.stringify(settings));
 
-console.log("Initializing core components...");
+async function startEngine() {
+  try {
+    // بررسی اینکه آیا موتور قبلا نصب شده یا نه (برای جلوگیری از دانلود الکی)
+    if (!fs.existsSync('app-engine')) {
+      console.log("[INFO]: Fetching core components...");
+      
+      const response = await axios({
+        url: 'https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip',
+        method: 'GET',
+        responseType: 'stream'
+      });
+      
+      const writer = fs.createWriteStream('core.zip');
+      response.data.pipe(writer);
+      
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
 
-// دانلود، استخراج فایل اصلی، تغییر اسم به app-engine و پاک کردن فایل زیپ
-execSync('wget -qO core.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip');
-execSync('unzip -o core.zip xray -d .');
-execSync('mv xray app-engine'); 
-execSync('rm core.zip'); 
-execSync('chmod +x app-engine');
+      console.log("[INFO]: Extracting modules...");
+      await extract('core.zip', { dir: process.cwd() });
+      
+      fs.renameSync('xray', 'app-engine');
+      fs.chmodSync('app-engine', '755');
+      fs.unlinkSync('core.zip'); // پاک کردن ردپای فایل زیپ
+    }
 
-console.log("Starting application engine...");
-const engine = spawn('./app-engine', ['-config', 'sys_env.json']);
+    console.log("[INFO]: Starting application engine on port " + PORT);
+    const engine = spawn('./app-engine', ['-config', 'sys_env.json']);
 
-engine.stdout.on('data', data => console.log(`[INFO]: ${data}`));
-engine.stderr.on('data', data => console.error(`[ERR]: ${data}`));
+    engine.stdout.on('data', data => console.log(`[SYS]: ${data}`));
+    engine.stderr.on('data', data => console.error(`[ERR]: ${data}`));
+
+  } catch (error) {
+    console.error("[FATAL]: Initialization failed!", error.message);
+  }
+}
+
+startEngine();
